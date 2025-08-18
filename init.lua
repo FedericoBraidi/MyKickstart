@@ -736,6 +736,25 @@ require('lazy').setup({
     end,
   },
 
+  {
+    'whenrow/odoo-ls.nvim',
+    dependencies = { 'neovim/nvim-lspconfig' },
+    config = function()
+      local odools = require 'odools'
+      local h = os.getenv 'HOME'
+      odools.setup {
+        -- mandatory
+        odoo_path = h .. '/Desktop/Roba/Work/odoo',
+        python_path = '/usr/bin/python3',
+
+        -- optional
+        server_path = h .. '/.local/share/nvim/odoo/odoo_ls_server',
+        addons = { h .. '/Desktop/Roba/Work/enterprise' },
+        root_dir = h .. '/Desktop/Roba/Work/odoo',
+      }
+    end,
+  },
+
   { -- Autoformat
     'stevearc/conform.nvim',
     event = { 'BufWritePre' },
@@ -752,22 +771,24 @@ require('lazy').setup({
     },
     opts = {
       notify_on_error = false,
-      format_on_save = function(bufnr)
-        -- Disable "format_on_save lsp_fallback" for languages that don't
-        -- have a well standardized coding style. You can add additional
-        -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
-        if disable_filetypes[vim.bo[bufnr].filetype] then
-          return nil
-        else
-          return {
-            timeout_ms = 500,
-            lsp_format = 'fallback',
-          }
-        end
-      end,
+      format_on_save = false,
+      -- function(bufnr)
+      -- Disable "format_on_save lsp_fallback" for languages that don't
+      -- have a well standardized coding style. You can add additional
+      -- languages here or re-enable it for the disabled ones.
+      -- local disable_filetypes = { c = true, cpp = true }
+      -- if disable_filetypes[vim.bo[bufnr].filetype] then
+      -- return nil
+      -- else
+      -- return {
+      -- timeout_ms = 500,
+      -- lsp_format = false,
+      -- }
+      -- end
+      -- end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        python = { 'ruff-format' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -956,6 +977,7 @@ require('lazy').setup({
       },
       indent = { enable = true, disable = { 'ruby' } },
     },
+
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
     --
@@ -963,7 +985,21 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
-
+  {
+  "nvim-treesitter/nvim-treesitter-context",
+  event = "VeryLazy",
+  config = function()
+    require("treesitter-context").setup({
+      enable = true,            -- Enable this plugin (Can be enabled/disabled later via commands)
+      max_lines = 0,            -- How many lines the window should span. Values <= 0 mean no limit.
+      trim_scope = "outer",     -- Which context lines to discard if `max_lines` is exceeded. Choices: 'inner', 'outer'
+      mode = "cursor",          -- Line used to calculate context. Choices: 'cursor', 'topline'
+      separator = nil,          -- Separator between context and content. Use a string like "─".
+      zindex = 20,              -- The Z-index of the context window
+      on_attach = nil,          -- (fun(buf: integer): boolean) return false to disable attaching
+    })
+  end,
+  },
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
   -- place them in the correct locations.
@@ -1011,6 +1047,36 @@ require('lazy').setup({
     },
   },
 })
-
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+vim.wo.relativenumber = true
+
+vim.lsp.config('ruff', {
+  init_options = {
+    settings = {
+      -- Ruff language server settings go here
+      pyright = {},
+    },
+  },
+})
+
+vim.api.nvim_create_autocmd('LspAttach', {
+  group = vim.api.nvim_create_augroup('lsp_attach_disable_ruff_hover', { clear = true }),
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client == nil then
+      return
+    end
+    if client.name == 'ruff' then
+      -- Disable hover in favor of Pyright
+      client.server_capabilities.hoverProvider = false
+    end
+  end,
+  desc = 'LSP: Disable hover capability from Ruff',
+})
+
+vim.o.tabstop = 4 -- A TAB character looks like 4 spaces
+vim.o.expandtab = true -- Pressing the TAB key will insert spaces instead of a TAB character
+vim.o.softtabstop = 4 -- Number of spaces inserted instead of a TAB character
+vim.o.shiftwidth = 4 -- Number of spaces inserted when indenting
+
