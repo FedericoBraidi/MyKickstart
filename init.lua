@@ -331,6 +331,14 @@ require('lazy').setup({
   --
   -- Use the `dependencies` key to specify the dependencies of a particular plugin
 
+  {
+    'f-person/git-blame.nvim',
+    config = function()
+      require('gitblame').setup {
+        enabled = false,
+      }
+    end,
+  },
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
     -- By default, Telescope is included and acts as your picker for everything.
@@ -394,6 +402,28 @@ require('lazy').setup({
         --   },
         -- },
         -- pickers = {}
+        defaults = {
+          preview = {
+            -- This stops the previewer from using the broken parsers
+            treesitter = true,
+          },
+          -- Optional: This helps avoid the "not in runtimepath"
+          -- issue by using a more stable preview maker
+          buffer_previewer_maker = require('telescope.previewers').buffer_previewer_maker,
+          mappings = {
+            i = { -- Insert mode
+              ['<C-p>'] = require('telescope.actions.layout').toggle_preview,
+            },
+            n = { -- Normal mode
+              ['<leader><C-p>'] = require('telescope.actions.layout').toggle_preview,
+            },
+          },
+        },
+        extensions = {
+          ['ui-select'] = {
+            require('telescope.themes').get_dropdown(),
+          },
+        },
         extensions = {
           ['ui-select'] = { require('telescope.themes').get_dropdown() },
         },
@@ -407,10 +437,22 @@ require('lazy').setup({
       local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-      vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
+      vim.keymap.set('n', '<leader>sf', function() builtin.find_files { cwd = vim.fn.expand '~' } end, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set({ 'n', 'v' }, '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-      vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
+      vim.keymap.set(
+        'n',
+        '<leader>sg',
+        function()
+          builtin.live_grep {
+            search_dirs = {
+              vim.fn.expand '~/odoo',
+              vim.fn.expand '~/enterprise',
+            },
+          }
+        end,
+        { desc = '[S]earch by [G]rep' }
+      )
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
@@ -877,7 +919,7 @@ require('lazy').setup({
     branch = 'main',
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter-intro`
     config = function()
-      local parsers = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' }
+      local parsers = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'javascript', 'python', 'xml' }
       require('nvim-treesitter').install(parsers)
       vim.api.nvim_create_autocmd('FileType', {
         callback = function(args)
@@ -953,3 +995,133 @@ require('lazy').setup({
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
+vim.wo.relativenumber = true
+
+vim.lsp.config('ruff', {
+  init_options = {
+    settings = {
+      -- Ruff language server settings go here
+      pyright = {},
+    },
+  },
+})
+
+vim.api.nvim_create_autocmd('LspAttach', {
+  group = vim.api.nvim_create_augroup('lsp_attach_disable_ruff_hover', { clear = true }),
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client == nil then return end
+    if client.name == 'ruff' then
+      -- Disable hover in favor of Pyright
+      client.server_capabilities.hoverProvider = false
+    end
+  end,
+  desc = 'LSP: Disable hover capability from Ruff',
+})
+
+vim.o.tabstop = 4 -- A TAB character looks like 4 spaces
+vim.o.expandtab = true -- Pressing the TAB key will insert spaces instead of a TAB character
+vim.o.softtabstop = 4 -- Number of spaces inserted instead of a TAB character
+vim.o.shiftwidth = 4 -- Number of spaces inserted when indenting
+vim.api.nvim_set_keymap('t', '<ESC>', '<C-\\><C-n>', { noremap = true })
+
+-- Git motions
+vim.keymap.set('n', '<leader>c', function() require('gitsigns').nav_hunk 'next' end, { desc = 'Go to first git hunk' })
+
+vim.keymap.set('n', '<leader>C', function() require('gitsigns').nav_hunk 'prev' end, { desc = 'Go to first git hunk' })
+
+-- Git blame keybinds
+local ns = vim.api.nvim_create_namespace 'range_blame'
+
+-- Helper to get the Git root for a file
+local function get_git_root(file)
+  local dir = vim.fn.fnamemodify(file, ':p:h')
+  local result = vim.system({ 'git', '-C', dir, 'rev-parse', '--show-toplevel' }):wait()
+  if result.code ~= 0 then return nil end
+  return result.stdout:gsub('\n', '')
+end
+
+function BlameSelection()
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+
+  -- Exit visual mode to have the limits of the selection
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'nx', false)
+
+  vim.schedule(function()
+    local start_line = vim.fn.getpos("'<")[2]
+    local end_line = vim.fn.getpos("'>")[2]
+    local file = vim.api.nvim_buf_get_name(bufnr)
+    if file == '' then return end
+
+    local git_root = get_git_root(file)
+    if not git_root then
+      print 'Not inside a git repository'
+      return
+    end
+
+    -- Relative path from git root
+    local rel_file = vim.fn.fnamemodify(file, ':.')
+
+    local result = vim
+      .system({
+        'git',
+        '-C',
+        git_root,
+        'blame',
+        '-L',
+        start_line .. ',' .. end_line,
+        '--porcelain',
+        rel_file,
+      })
+      :wait()
+
+    if result.code ~= 0 then return end
+
+    -- Get results of the command
+    local lines = vim.split(result.stdout, '\n')
+    local commit_cache = {}
+    local current_hash = nil
+    local current_output_line = start_line
+
+    for _, line in ipairs(lines) do
+      -- git blame --porcelain collapses results for commits already referenced, so we need to remember the data
+      local hash = line:match '^(%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x)'
+      if hash then
+        current_hash = hash
+        if not commit_cache[hash] then commit_cache[hash] = { author = 'Unknown', date = 'N/A', summary = 'Empty' } end
+      end
+
+      local author = line:match '^author (.+)'
+      if author then commit_cache[current_hash].author = author end
+
+      local time = line:match '^author%-time (%d+)'
+      if time then commit_cache[current_hash].date = os.date('%Y-%m-%d', tonumber(time)) end
+
+      local summary = line:match '^summary (.+)'
+      if summary then commit_cache[current_hash].summary = summary end
+
+      if line:sub(1, 1) == '\t' then
+        local info = commit_cache[current_hash]
+        local display_text = string.format('%s • %s • %s', info.author, info.date, info.summary)
+        vim.api.nvim_buf_set_extmark(bufnr, ns, current_output_line - 1, 0, {
+          virt_text = { { display_text, 'Comment' } },
+          virt_text_pos = 'eol',
+        })
+        current_output_line = current_output_line + 1
+      end
+    end
+  end)
+end
+
+vim.keymap.set('v', '<leader>gb', ':lua BlameSelection()<CR>', { silent = true })
+vim.keymap.set({ 'n', 'v' }, '<leader>go', function() require('gitblame').open_commit_url() end, {
+  silent = true,
+  desc = 'Open commit in GitHub',
+})
+
+-- Keybind to open code on current file
+vim.keymap.set('n', '<leader>code', function()
+  local file = vim.api.nvim_buf_get_name(0)
+  vim.cmd('!code "' .. file .. '"')
+end, { desc = 'Open current file in VS Code' })
