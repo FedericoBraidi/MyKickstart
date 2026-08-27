@@ -33,6 +33,7 @@ vim.keymap.set(
       search_dirs = {
         vim.fn.expand '~/odoo',
         vim.fn.expand '~/enterprise',
+        vim.fn.expand '~/upgrade',
       },
     }
   end,
