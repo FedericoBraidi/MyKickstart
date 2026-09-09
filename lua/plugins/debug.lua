@@ -75,8 +75,8 @@ dapui.setup {
     {
       -- Bottom panel
       elements = {
-        { id = 'repl', size = 0.7 },
-        { id = 'console', size = 0.3 },
+        { id = 'repl', size = 0.5 },
+        { id = 'console', size = 0.5 },
       },
       size = 20, -- height in rows
       position = 'bottom',
@@ -119,7 +119,7 @@ require('dap-python').setup 'python3'
 
 dap.configurations.python = {
   {
-    name = 'Python: Odoo HR',
+    name = 'Python: Odoo HR Run',
     type = 'python',
     request = 'launch',
     program = vim.fn.expand '~/odoo/odoo-bin',
@@ -131,6 +131,29 @@ dap.configurations.python = {
       '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
       '--dev=all',
     },
+  },
+  {
+    name = 'Python: Odoo HR Create',
+    type = 'python',
+    request = 'launch',
+    program = vim.fn.expand '~/odoo/odoo-bin',
+    console = 'integratedTerminal',
+    args = function()
+      -- Prompt the user for the modules to install
+      local modules = vim.fn.input 'Module names: '
+
+      return {
+        'start',
+        '-d',
+        'test',
+        '--with-demo',
+        '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
+        '--dev=all',
+        '-i',
+        modules,
+        '--dev=all',
+      }
+    end,
   },
   {
     name = 'Python: Odoo HR Test',
@@ -164,8 +187,49 @@ dap.configurations.python = {
       'start',
       '-d',
       'test',
+      '-u', 'all',
+      '--st',
       '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
-      '--upgrade-path=../upgrade-util/src,../upgrade/migrations -u all --st',
+      '--upgrade-path=' .. vim.fn.expand '~/upgrade-util/src' .. ',' .. vim.fn.expand '~/upgrade/migrations',
+    },
+  },
+  {
+    name = 'Python: Odoo HR Run Upgrade Prepare',
+    type = 'python',
+    request = 'launch',
+    program = vim.fn.expand '~/odoo/odoo-bin',
+    console = 'integratedTerminal',
+    args = function()
+      return {
+        'start',
+        '-d',
+        'test',
+        '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
+        '--upgrade-path=' .. vim.fn.expand '~/upgrade-util/src' .. ',' .. vim.fn.expand '~/upgrade/migrations',
+        '--test-tags',
+        'upgrade.test_prepare',
+        '--stop-after-init',
+      }
+    end,
+  },
+  {
+    name = 'Python: Odoo HR Run Upgrade Check',
+    type = 'python',
+    request = 'launch',
+    program = vim.fn.expand '~/odoo/odoo-bin',
+    console = 'integratedTerminal',
+    args = {
+      'start',
+      '-d',
+      'test',
+      '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
+      '--upgrade-path=' .. vim.fn.expand '~/upgrade-util/src' .. ',' .. vim.fn.expand '~/upgrade/migrations',
+      '--test-tags',
+      'upgrade.test_check',
+      '--stop-after-init',
     },
   },
 }
+
+-- Keybind to resize
+vim.keymap.set('n', '<C-.>', ':vertical resize 90<CR>', { silent = true })

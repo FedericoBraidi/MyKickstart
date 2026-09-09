@@ -5,19 +5,34 @@ local telescope_plugins = {
   gh 'nvim-lua/plenary.nvim',
   gh 'nvim-telescope/telescope.nvim',
   gh 'nvim-telescope/telescope-ui-select.nvim',
+  gh 'nvim-telescope/telescope-live-grep-args.nvim',
 }
 if vim.fn.executable 'make' == 1 then table.insert(telescope_plugins, gh 'nvim-telescope/telescope-fzf-native.nvim') end
 
 vim.pack.add(telescope_plugins)
 
+local lga_actions = require 'telescope-live-grep-args.actions'
+
 require('telescope').setup {
   extensions = {
     ['ui-select'] = { require('telescope.themes').get_dropdown() },
+    live_grep_args = {
+      auto_quoting = true, -- Keep it on for basic strings
+      mappings = {
+        i = {
+          -- Pressing Ctrl+k quotes your current text so you can safely type flags
+          ['<C-k>'] = lga_actions.quote_prompt(),
+          -- Pressing Ctrl+i quotes the text and automatically appends a file glob flag
+          ['<C-i>'] = lga_actions.quote_prompt { postfix = ' --iglob ' },
+        },
+      },
+    },
   },
 }
 
 pcall(require('telescope').load_extension, 'fzf')
 pcall(require('telescope').load_extension, 'ui-select')
+pcall(require('telescope').load_extension, 'live_grep_args')
 
 local builtin = require 'telescope.builtin'
 vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
@@ -25,21 +40,16 @@ vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps'
 vim.keymap.set('n', '<leader>sf', function() builtin.find_files { cwd = vim.fn.expand '~' } end, { desc = '[S]earch [F]iles' })
 vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
 vim.keymap.set({ 'n', 'v' }, '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-vim.keymap.set(
-  'n',
-  '<leader>sg',
-  function()
-    builtin.live_grep {
-      search_dirs = {
-        vim.fn.expand '~/odoo',
-        vim.fn.expand '~/enterprise',
-        vim.fn.expand '~/upgrade',
-      },
-    }
-  end,
-  { desc = '[S]earch by [G]rep' }
-)
-vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
+vim.keymap.set('n', '<leader>sg', function()
+  require('telescope').extensions.live_grep_args.live_grep_args {
+    search_dirs = {
+      vim.fn.expand '~/odoo',
+      vim.fn.expand '~/enterprise',
+      vim.fn.expand '~/upgrade',
+      vim.fn.expand '~/upgrade-util',
+    },
+  }
+end, { desc = '[S]earch [G]rep (supports "term -g *.xml" via live_grep_args)' })
 vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
 vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
 vim.keymap.set('n', '<leader>sc', builtin.commands, { desc = '[S]earch [C]ommands' })

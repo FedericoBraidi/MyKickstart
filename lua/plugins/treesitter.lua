@@ -52,3 +52,8 @@ require('treesitter-context').setup {
   max_lines = 3,
   multiline_threshold = 20,
 }
+
+-- Jump to the first line of the parent context
+vim.keymap.set('n', '<leader>p', function()
+  require('treesitter-context').go_to_context(vim.v.count1)
+end, { desc = 'Jump to parent context start' })
