@@ -82,4 +82,37 @@ function M.blame_selection()
   end)
 end
 
+-- Open the commit of the cursor line in the browser.
+-- Blame is computed fresh each time (gitblame's own cache goes stale since the plugin is disabled)
+function M.open_line_commit()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local file = vim.api.nvim_buf_get_name(bufnr)
+  if file == '' then return end
+
+  local git_root = get_git_root(file)
+  if not git_root then
+    print 'Not inside a git repository'
+    return
+  end
+
+  -- Feed the buffer content so unsaved edits don't shift the line numbers
+  local content = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), '\n') .. '\n'
+  local result = vim
+    .system({ 'git', '-C', git_root, 'blame', '--porcelain', '-L', line .. ',' .. line, '--contents', '-', file }, { stdin = content })
+    :wait()
+  if result.code ~= 0 then
+    print 'Git blame failed'
+    return
+  end
+
+  local sha = result.stdout:match '^(%x+)'
+  if not sha or sha:match '^0+$' then
+    print 'Line not committed yet'
+    return
+  end
+
+  require('gitblame.git').open_commit_in_browser(sha)
+end
+
 return M

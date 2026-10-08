@@ -130,6 +130,7 @@ dap.configurations.python = {
       'test',
       '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
       '--dev=all',
+      '--with-test-data',
     },
   },
   {
@@ -152,6 +153,7 @@ dap.configurations.python = {
         '-i',
         modules,
         '--dev=all',
+        '--with-test-data',
       }
     end,
   },
@@ -174,6 +176,7 @@ dap.configurations.python = {
         '--dev=all',
         '--test-tags',
         tag,
+        '--with-test-data',
       }
     end,
   },
@@ -191,6 +194,7 @@ dap.configurations.python = {
       '--st',
       '--addons-path=' .. vim.fn.expand '~/odoo/addons' .. ',' .. vim.fn.expand '~/enterprise',
       '--upgrade-path=' .. vim.fn.expand '~/upgrade-util/src' .. ',' .. vim.fn.expand '~/upgrade/migrations',
+      '--with-test-data',
     },
   },
   {
@@ -209,6 +213,7 @@ dap.configurations.python = {
         '--test-tags',
         'upgrade.test_prepare',
         '--stop-after-init',
+        '--with-test-data',
       }
     end,
   },
@@ -227,6 +232,7 @@ dap.configurations.python = {
       '--test-tags',
       'upgrade.test_check',
       '--stop-after-init',
+      '--with-test-data',
     },
   },
 }

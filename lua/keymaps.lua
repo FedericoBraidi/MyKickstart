@@ -49,6 +49,6 @@ vim.keymap.set('v', '<leader>gb', blame.blame_selection, {
   desc = 'Git blame selection',
 })
 
-vim.keymap.set({ 'n', 'v' }, '<leader>go', function() require('gitblame').open_commit_url() end, {
+vim.keymap.set({ 'n', 'v' }, '<leader>go', blame.open_line_commit, {
   desc = 'Open commit in GitHub',
 })
