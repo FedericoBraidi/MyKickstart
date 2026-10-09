@@ -86,6 +86,7 @@ local servers = {
     },
   },
   stylua = {}, -- Used to format Lua code
+  marksman = {}, -- Markdown: follow links, heading outline
 
   -- Special Lua Config, as recommended by neovim help docs
   lua_ls = {

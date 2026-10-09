@@ -9,6 +9,7 @@ require 'plugins.lspconfig'
 require 'plugins.conform'
 require 'plugins.blink-cmp'
 require 'plugins.treesitter'
+require 'plugins.render-markdown'
 --add stuff to treesitter
 require 'plugins.debug'
 require 'plugins.indent_line'
